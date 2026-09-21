@@ -5,11 +5,12 @@
   "description": "CareDesk — biometric patient identification dashboard (MongoDB + Express + React + Node)",
   "scripts": {
     "install-all": "npm install --prefix server && npm install --prefix client",
+    "postinstall": "npm run install-all",
     "server": "npm run dev --prefix server",
     "client": "npm start --prefix client",
     "dev": "concurrently -n SERVER,CLIENT -c green,cyan \"npm:server\" \"npm:client\"",
     "build": "npm run build --prefix client",
-    "start": "npm run build --prefix client && npm start --prefix server"
+    "start": "npm start --prefix server"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
