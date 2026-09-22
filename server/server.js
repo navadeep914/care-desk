@@ -36,6 +36,8 @@ app.get('*', (req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`CareDesk API listening on http://localhost:${PORT} [Storage: ${store.getMode()}]`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(
+    `CareDesk API listening on port ${PORT} [Storage: ${store.getMode()}]`
+  );
 });
