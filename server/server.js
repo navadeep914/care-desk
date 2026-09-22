@@ -2,7 +2,7 @@ require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
+const store = require('./db/store');
 
 const patientsRouter = require('./routes/patients');
 const queueRouter = require('./routes/queue');
@@ -19,7 +19,7 @@ app.use('/api/visits', visitsRouter);
 app.use('/api', sensorRouter);
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', mongoConnected: mongoose.connection.readyState === 1 });
+  res.json({ status: 'ok', database: store.getMode(), time: new Date().toISOString() });
 });
 
 // In production, serve the React app that `npm run build` produces.
@@ -35,17 +35,7 @@ app.get('*', (req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/caredesk';
 
-mongoose
-  .connect(MONGODB_URI, { serverSelectionTimeoutMS: 6000 })
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`CareDesk API listening on http://localhost:${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('Could not connect to MongoDB:', err.message);
-    console.error('Check MONGODB_URI in server/.env — see server/.env.example. Is MongoDB running?');
-    process.exit(1);
-  });
+app.listen(PORT, () => {
+  console.log(`CareDesk API listening on http://localhost:${PORT} [Storage: ${store.getMode()}]`);
+});

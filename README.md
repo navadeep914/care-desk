@@ -1,110 +1,91 @@
-# CareDesk — MERN Stack
+# CareDesk — Biometric Patient Identification System (IDS)
 
-MongoDB + Express + React + Node — frontend, backend, and database setup
-all live together in this one project folder.
+Express + React + Node — frontend, backend, and unified storage setup
+all live together in this project.
 
 ```
-caredesk-mern/
-  server/            Express API + Mongoose models (talks to MongoDB)
-    models/
-    routes/
-    server.js
+caredesk/
+  server/            Express API + Unified Store (File/Supabase)
+    db/store.js      Database store interface
+    routes/          REST API endpoints
+    server.js        Express server entrypoint
     .env.example
-  client/            React app (the dashboard UI)
+  client/            React app (clinical dashboard UI)
     public/
     src/
       pages/
-  package.json       Root convenience scripts (run both together)
+  package.json       Root convenience & deployment scripts
   README.md
 ```
 
 ## 1. Prerequisites
 
 - Node.js 18+ and npm
-- A MongoDB database to connect to — either:
-  - **Local**: install [MongoDB Community Server](https://www.mongodb.com/try/download/community) and have it running (`mongod`), or
-  - **Cloud**: a free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register) cluster (no local install needed)
+- Zero external database installation required! CareDesk now uses an embedded persistent store (`server/data/db.json`) out of the box.
+
+*(Optional)* If you wish to connect to **Supabase**, simply provide `SUPABASE_URL` and `SUPABASE_KEY` in `server/.env`.
 
 ## 2. Install everything
 
-From the `caredesk-mern` folder:
+From the root project folder:
 
 ```bash
 npm run install-all
 ```
 
 This installs dependencies for both `server/` and `client/` in one go.
-(Or install them separately: `cd server && npm install`, `cd client && npm install`.)
 
-## 3. Configure the database connection
+## 3. Configuration
 
 ```bash
 cd server
 cp .env.example .env
 ```
 
-Open `server/.env` and set `MONGODB_URI`:
+Settings in `server/.env`:
+- `PORT=5000` (Default API port)
+- `SUPABASE_KEY=...` (Optional, if syncing with Supabase)
 
-- Local MongoDB (default, no changes needed):
-  `mongodb://127.0.0.1:27017/caredesk`
-- MongoDB Atlas: paste the connection string Atlas gives you under
-  **Connect → Drivers**, and add `/caredesk` before the `?` as the database name:
-  `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/caredesk`
+## 4. Run Locally (Development)
 
-You don't need to create any collections yourself — Mongoose creates
-`patients`, `queue`, and `visits` automatically the first time each is
-written to.
-
-## 4. Run it
-
-From the root `caredesk-mern` folder, one command runs both the API and
-the dashboard together, with auto-reload on changes:
+From the root project folder:
 
 ```bash
 npm run dev
 ```
 
 - API: http://localhost:5000
-- Dashboard: http://localhost:3000 (opens automatically, and proxies its
-  `/api/*` calls to the server on port 5000 — configured via `"proxy"`
-  in `client/package.json`)
+- Dashboard: http://localhost:3000 (proxies `/api/*` calls to the server on port 5000)
 
-Open **http://localhost:3000** and sign in with any username/password —
-this project has no real authentication system, it's a front-end login
-screen for the clinical workflow, same as before.
+Open **http://localhost:3000** and sign in with any username/password.
 
-## 5. Production build (one server, one port)
+## 5. Production & Deployment (e.g. Render)
 
 ```bash
 npm run build   # builds the React app into client/build
-npm start       # builds (if needed) then serves everything from server on :5000
+npm start       # serves everything from Express server on :5000 (or cloud $PORT)
 ```
 
-In production mode, `server.js` serves the built React app directly, so
-only port 5000 is needed — no separate client server.
+Because `server.js` serves the built React app directly, deploying to Render requires only **one single web service**:
+- Build Command: `npm install && npm run build`
+- Start Command: `npm start`
 
-## 6. Connecting your real ESP32 + fingerprint sensor
+## 6. Hardware Integration (ESP32 + Fingerprint Sensor)
 
-Two routes exist specifically for your hardware, same shape as before:
+Two routes exist specifically for your hardware:
 
 - **`POST /api/enroll`** — call after the R307/AS608 sensor stores a new
-  fingerprint template, to link it to a patient already registered here.
+  fingerprint template, to link it to a patient already registered here:
   ```json
   { "patient_id": "P1001", "template_id": 7 }
   ```
-- **`POST /api/identify`** — call when the sensor matches a scanned
-  thumb, to fetch that patient's record.
+- **`POST /api/identify`** — call when the sensor matches a scanned thumb:
   ```json
   { "template_id": 7 }
   ```
-  (Also accepts `{ "patient_id": "P1001" }` directly — that's what the
-  dashboard's own Manual ID Lookup and demo scan control use.)
+  *(Also accepts `{ "patient_id": "P1001" }` for manual ID lookup).*
 
-Both return the patient record as JSON, or a 404 if there's no match.
-Point your ESP32's HTTP client at `http://<this-computer's-IP>:5000/api/enroll`
-and `/api/identify`.
-
-## 7. All API routes
+## 7. API Reference
 
 | Method | Path                 | Purpose                                     |
 |--------|----------------------|----------------------------------------------|
@@ -119,31 +100,4 @@ and `/api/identify`.
 | PATCH  | /api/queue/:id       | Update a queue entry's status                |
 | GET    | /api/visits          | List consultation records                    |
 | POST   | /api/visits          | Save a consultation (auto-closes queue entry)|
-| GET    | /api/health          | `{ status, mongoConnected }` — quick check   |
-
-## 8. One honest limitation, unchanged from before
-
-A browser still can't read a real USB/serial fingerprint sensor — so on
-the **Scan Patient** and **Register Patient** pages, the actual thumb
-scan is simulated in the UI (see the small "Demo control" dropdown).
-Patient records, the queue, and consultations are all real and stored in
-MongoDB. Once your ESP32 is calling `/api/enroll` / `/api/identify`
-directly, it plugs into this exact same backend and database.
-
-## 9. What was verified before this was handed to you
-
-- `npm install` succeeds for both `server/` and `client/`
-- Every server file passes a Node syntax check
-- `server.js` boots and — if MongoDB isn't reachable — fails with a
-  clear error instead of crashing silently
-- `npm run build` in `client/` compiles the full React app with zero
-  errors or warnings
-- A full end-to-end run against a real MongoDB (patient creation, queue,
-  fingerprint enroll/identify, and consultation save with automatic
-  queue close-out) was verified against the equivalent Express routes in
-  an earlier version of this backend
-
-I couldn't spin up an actual MongoDB instance in the environment this was
-built in to re-run that exact end-to-end pass on this MERN copy, so
-after you run `npm run dev`, try registering a patient end-to-end and
-let me know right away if anything doesn't work.
+| GET    | /api/health          | `{ status, database }` health check          |

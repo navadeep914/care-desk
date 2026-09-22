@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Patient = require('../models/Patient');
+const store = require('../db/store');
 const { serializePatient } = require('../utils/serialize');
 
 // POST /api/enroll
@@ -13,15 +13,20 @@ router.post('/enroll', async (req, res) => {
     return res.status(400).json({ error: 'patient_id and template_id are required' });
   }
   const id = String(patient_id).toUpperCase();
+  const tId = Number(template_id);
 
-  const clash = await Patient.findOne({ fingerprintTemplateId: template_id, _id: { $ne: id } });
-  if (clash) {
-    return res.status(400).json({ error: `That template_id is already linked to patient ${clash._id}` });
+  try {
+    const clash = await store.findPatientByTemplate(tId);
+    if (clash && String(clash.id).toUpperCase() !== id) {
+      return res.status(400).json({ error: `That template_id is already linked to patient ${clash.id}` });
+    }
+
+    const p = await store.updatePatient(id, { fingerprintTemplateId: tId });
+    if (!p) return res.status(404).json({ error: 'No patient with that ID' });
+    res.json({ status: 'ok', patient: serializePatient(p) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const p = await Patient.findByIdAndUpdate(id, { fingerprintTemplateId: template_id }, { new: true }).lean();
-  if (!p) return res.status(404).json({ error: 'No patient with that ID' });
-  res.json({ status: 'ok', patient: serializePatient(p) });
 });
 
 // POST /api/identify
@@ -32,15 +37,21 @@ router.post('/enroll', async (req, res) => {
 router.post('/identify', async (req, res) => {
   const { template_id, patient_id } = req.body || {};
   let p = null;
-  if (template_id !== undefined) {
-    p = await Patient.findOne({ fingerprintTemplateId: template_id }).lean();
-  } else if (patient_id) {
-    p = await Patient.findById(String(patient_id).toUpperCase()).lean();
-  } else {
-    return res.status(400).json({ error: 'template_id or patient_id is required' });
+
+  try {
+    if (template_id !== undefined) {
+      p = await store.findPatientByTemplate(Number(template_id));
+    } else if (patient_id) {
+      p = await store.getPatientById(String(patient_id).toUpperCase());
+    } else {
+      return res.status(400).json({ error: 'template_id or patient_id is required' });
+    }
+
+    if (!p) return res.status(404).json({ error: 'No matching patient record' });
+    res.json(serializePatient(p));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  if (!p) return res.status(404).json({ error: 'No matching patient record' });
-  res.json(serializePatient(p));
 });
 
 module.exports = router;
